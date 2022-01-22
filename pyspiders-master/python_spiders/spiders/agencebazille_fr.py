@@ -1,0 +1,146 @@
+# -*- coding: utf-8 -*-
+# Author: Mehmet Kurtipek
+
+from scrapy.loader.processors import MapCompose
+from scrapy import Spider
+from scrapy import Request,FormRequest
+from scrapy.selector import Selector 
+from w3lib.html import remove_tags
+from python_spiders.loaders import ListingLoader
+import json
+import re
+import dateparser
+class MySpider(Spider):
+    name = 'agencebazille_fr'
+    execution_type='testing'
+    country='france'
+    locale='fr'
+    external_source="Agencebazille_PySpider_france"
+    custom_settings = {"HTTPCACHE_ENABLED": False}
+    formdata = {
+        "data[Search][offredem]": "2",
+        "data[Search][idtype][]": "",
+        "data[Search][prixmax]": "",
+        "data[Search][piecesmin]": "",
+        "data[Search][surfmin]": "",
+        "data[Search][NO_DOSSIER]": ""
+    }
+    
+    def start_requests(self):
+        start_urls = [
+            {
+                "type": "2_4_18_31_26_41",
+                "property_type": "apartment"
+            },
+	        {
+                "type": "25_22_1_10_11_28_30_39_27",
+                "property_type": "house"
+            },
+        ]  # LEVEL 1
+        
+        for url in start_urls:
+            self.formdata["data[Search][idtype][]"] = url.get('type')
+            yield FormRequest(
+                url="https://www.agencebazille.fr/recherche/",
+                callback=self.parse,
+                formdata=self.formdata,
+                dont_filter=True,
+                meta={
+                    'property_type': url.get('property_type'),
+                }
+            )
+    # 1. FOLLOWING
+    def parse(self, response):
+
+        for item in  response.xpath("//a[@class='links-group__link  button']/@href").getall():
+            follow_url = response.urljoin(item)
+            yield Request(follow_url, callback=self.populate_item,meta={'property_type': response.meta.get('property_type')})
+            
+        nextpage=response.xpath("//ul[@class='pagination__items']//li[@class='pagination__item'][last()]/a[@class='pagination__link']/@href").get()
+        if nextpage:
+            yield Request(response.urljoin(nextpage), callback=self.parse,meta={'property_type': response.meta.get('property_type')})
+
+    def populate_item(self, response):
+        item_loader = ListingLoader(response=response)
+        item_loader.add_value("external_source",self.external_source)
+        item_loader.add_value("property_type", response.meta.get('property_type'))
+        item_loader.add_value("external_link", response.url)
+        dontallow=response.url
+        if dontallow and "alerte" in dontallow:
+            return 
+
+        title=response.xpath("//h1[@class='title-subtitle__content']/span/text()").get()
+        if title:
+            item_loader.add_value("title",title)
+        property_type=response.xpath("//h1[@class='title-subtitle__content']/span/text()").get()
+        if property_type:
+            if "Studio" in property_type:
+                item_loader.add_value("property_type","studio")
+            if "Appartement" in property_type:
+                item_loader.add_value("property_type","apartment")
+            if "Maison" in property_type:
+                item_loader.add_value("property_type","house")
+            if "Parking" in property_type:
+                return
+        adres=response.xpath("//span[.='Ville']/following-sibling::span/text()").get()
+        if adres:
+            item_loader.add_value("address",adres.replace("\n","").strip())
+        zipcode=response.xpath("//span[.='Code postal']/following-sibling::span/text()").get()
+        if zipcode:
+            item_loader.add_value("zipcode",zipcode.strip())
+        city=response.xpath("//span[.='Ville']/following-sibling::span/text()").get()
+        if city:
+            item_loader.add_value("city",city.replace("\n","").strip())
+        square_meters=response.xpath("//span[.='Surface habitable (m²)']/following-sibling::span/text()").get()
+        if square_meters:
+            item_loader.add_value("square_meters",square_meters.split("m²")[0].split(",")[0].strip())
+        room_count=response.xpath("//span[.='Nombre de pièces']/following-sibling::span/text()").get()
+        if room_count:
+            item_loader.add_value("room_count",room_count.strip())
+        bathroom_count=response.xpath("//span[contains(.,'Nb de salle d')]/following-sibling::span/text()").get()
+        if bathroom_count:
+            item_loader.add_value("bathroom_count",bathroom_count.strip())
+        furnished=response.xpath("//span[.='Meublé']/following-sibling::span/text()").get()
+        if furnished and "non" in furnished.lower():
+            item_loader.add_value("furnished",False)
+        if furnished and "oui" in furnished.lower():
+            item_loader.add_value("furnished",True)
+        elevator=response.xpath("//span[.='Ascenseur']/following-sibling::span/text()").get()
+        if elevator and "non" in elevator.lower():
+            item_loader.add_value("elevator",False)
+        if elevator and "oui" in elevator.lower():
+            item_loader.add_value("elevator",True)
+        balcony=response.xpath("//span[.='Balcon']/following-sibling::span/text()").get()
+        if balcony and "non" in balcony.lower():
+            item_loader.add_value("balcony",False)
+        if balcony and "oui" in balcony.lower():
+            item_loader.add_value("balcony",True)
+        terrace=response.xpath("//span[.='Terrasse']/following-sibling::span/text()").get()
+        if terrace and "non" in terrace.lower():
+            item_loader.add_value("terrace",False)
+        if terrace and "oui" in terrace.lower():
+            item_loader.add_value("terrace",True)
+        floor=response.xpath("//span[.='Etage']/following-sibling::span/text()").get()
+        if floor:
+            item_loader.add_value("floor",floor)
+        rent=response.xpath("//span[.='Loyer CC* / mois']/following-sibling::span/text()").get()
+        if rent:
+            item_loader.add_value("rent",rent.split("€")[0].replace(" ","").strip())
+        item_loader.add_value("currency","EUR")
+        utilities=response.xpath("//span[.='Honoraires TTC charge locataire']/following-sibling::span/text()").get()
+        if utilities:
+            item_loader.add_value("utilities",utilities.split("€")[0].split(",")[0].strip())
+        deposit=response.xpath("//span[.='Dépôt de garantie TTC']/following-sibling::span/text()").get()
+        if deposit:
+            item_loader.add_value("deposit",deposit.split("€")[0].strip())
+        images=[x for x in response.xpath("//picture//img//@data-src").getall()] 
+        if images:
+            item_loader.add_value("images",images)
+        external_id=response.xpath("//div[@class='main-info__info-id']/text()").get()
+        if external_id:
+            item_loader.add_value("external_id",external_id.split(":")[-1].strip())
+        item_loader.add_value("landlord_name","Agence Bazille")
+        item_loader.add_value("landlord_phone","04 67 64 58 74")
+        
+
+        yield item_loader.load_item()
