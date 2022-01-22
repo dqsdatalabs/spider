@@ -422,8 +422,6 @@ def get_amenities(description, Amenties_text, item_loader):
     dishwasher = True if any(
         x in description for x in Amenties['dishwasher']) else None
 
-
-    x=123
     item_loader.add_value("pets_allowed", pets_allowed)  # Boolean
     item_loader.add_value("furnished", furnished)  # Boolean
     item_loader.add_value("parking", parking)  # Boolean
