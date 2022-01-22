@@ -1,0 +1,24 @@
+.vscode
+.scrapy/
+build/
+pipeline/terraform.tfstate.backup
+project.egg-info
+
+*.pyc
+*.log
+*.json
+
+# pyCharm Project Settings Folder
+.idea/
+
+polygons/polygons.jl
+polygons/index.html
+fonts/
+scrapinghub.yml
+setup.py
+output/
+
+.envrc
+
+venv
+*.csv

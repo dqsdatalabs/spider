@@ -1,0 +1,12 @@
+js2xml==0.4.0
+pylint==2.6.0
+requests==2.24.0
+Scrapy==2.3.0
+selenium==3.141.0
+dateparser
+geopy
+bs4
+json2html
+scrapyd
+word2number
+scrapy-sentry

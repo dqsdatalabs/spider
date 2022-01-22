@@ -1,0 +1,26 @@
+# -*- coding: utf-8 -*-
+# Author: 
+import scrapy
+from ..loaders import ListingLoader
+
+class $classname(scrapy.Spider):
+    name = "$name"
+    allowed_domains = ["$domain"]
+    start_urls = (
+        'http://www.$domain/',
+    )
+    execution_type = 'testing'
+    country = 'belgium'
+    locale ='fr'
+    thousand_separator='.'
+    scale_separator=','
+
+    def start_requests(self):
+        for url in self.start_urls:
+            yield scrapy.Request(url, callback=self.parse)
+
+    def parse(self, response, **kwargs):
+        item_loader = ListingLoader(response=response)
+        item_loader.add_value("external_link", response.url)
+        item_loader.add_value("external_source", "{}_PySpider_{}_{}".format(self.name.capitalize(), self.country, self.locale))
+        yield item_loader.load_item()
