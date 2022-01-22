@@ -3,6 +3,7 @@ from datetime import datetime
 import requests
 from io import StringIO
 from html.parser import HTMLParser
+import numpy
 
 
 class MLStripper(HTMLParser):
