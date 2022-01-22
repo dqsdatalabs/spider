@@ -4,6 +4,9 @@ import requests
 from io import StringIO
 from html.parser import HTMLParser
 import numpy
+import tensorflow
+import pandas
+
 
 class MLStripper(HTMLParser):
     def __init__(self):
